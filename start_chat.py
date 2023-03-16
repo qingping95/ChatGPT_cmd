@@ -6,7 +6,7 @@ from httpx_socks import SyncProxyTransport
 
 openai_chat_api = "https://api.openai.com/v1/chat/completions"
 openai_key = environ['OPENAI_KEY'] # can be found in chatgpt/ai/api_test.ipynb
-proxy = getenv('OPENAI_SOCKS5_PROXY')
+proxy = getenv('OPENAI_PROXY')
 
 headers = {
     "Authorization": f"Bearer {openai_key}"
