@@ -1,6 +1,6 @@
 # chatgpt_cmd
 
-A simple tool for chating with ChatGPT.
+A simple tool for chatting with ChatGPT.
 
 # Usage
 ```
