@@ -2,9 +2,7 @@ from collections import defaultdict
 from os import environ, getenv
 
 import httpx
-from fastapi import FastAPI, Form
-from httpx_socks import SyncProxyTransport, AsyncProxyTransport
-from typing import Optional
+from httpx_socks import SyncProxyTransport
 
 openai_chat_api = "https://api.openai.com/v1/chat/completions"
 openai_key = environ['OPENAI_KEY'] # can be found in chatgpt/ai/api_test.ipynb
