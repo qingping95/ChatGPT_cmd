@@ -45,20 +45,38 @@ def input_with_enter(hint=''):
     print('<OK>')
     return '\n'.join(text)
 
+def save_history(history, save_path):
+    """json line"""
+    import json
+    import time 
+    with open(save_path, 'a') as f:
+        f.write(time.strftime('%Y/%m/%d-%H:%M:%S '))
+        json.dump(history, f)
+        f.write('\n')
+
+def save_and_clear_history(history, instruct='', save_path='chat_history.log'):
+    save_history(history, save_path)
+    history = [{"role": "system", "content": instruct}]
+    print("已经清除历史记录，请重新提问。")
+    return history
+
 def start_chat(instruct, multiline_input=False):
     history = [{"role": "system", "content": instruct}]
-    while True:
-        print('-'*40+'\n')
-        if multiline_input:
-            question = input_with_enter("问：")
-        else:
-            question = input('问：')
-        if question == 'clear':
-            history = [{"role": "system", "content": instruct}]
-            print("已经清除历史记录，请重新提问。")
-            continue
-        rep = get_reply(question, history)
-        print("\nChatGPT：\n", rep)
+    try:
+        while True:
+            print('-'*40+'\n')
+            if multiline_input:
+                question = input_with_enter("问：")
+            else:
+                question = input('问：')
+            if question == 'clear':
+                history = save_and_clear_history(history, instruct)
+                continue
+            rep = get_reply(question, history)
+            print("\nChatGPT：\n", rep)
+    except Exception as e:
+        save_and_clear_history(history)
+        raise e 
 
 def main():
     import sys
