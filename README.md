@@ -16,5 +16,5 @@ OPENAI_KEY=<YOUR_OPENAI_KEY> python start_chat.py <SYSTEM_INSTRUCT>
 For example:
 ```
 export OPENAI_PROXY=localhost:6006
-OPENAI_KEY=<YOUR_OPENAI_KEY> python start_chat.py You are a professional assistant
+OPENAI_KEY=<YOUR_OPENAI_KEY> python start_chat.py "You are a professional assistant"
 ```
