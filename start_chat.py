@@ -60,7 +60,7 @@ def save_and_clear_history(history, instruct='', save_path='chat_history.log'):
     print("已经清除历史记录，请重新提问。")
     return history
 
-def start_chat(instruct, multiline_input=False):
+def start_chat(instruct, multiline_input=True):
     history = [{"role": "system", "content": instruct}]
     try:
         while True:
