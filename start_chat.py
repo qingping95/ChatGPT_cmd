@@ -72,6 +72,7 @@ def start_chat(instruct, multiline_input=True):
             if question == 'clear':
                 history = save_and_clear_history(history, instruct)
                 continue
+            # history = [{"role": "system", "content": instruct}]
             rep = get_reply(question, history)
             print("\nChatGPT：\n", rep)
     except Exception as e:
@@ -79,11 +80,13 @@ def start_chat(instruct, multiline_input=True):
         raise e 
 
 def main():
-    import sys
+    import sys, argparse
     instruct = "你是一个专业的工作助手，需要回答各种具备专业知识的问题，要求回答严谨、精确。"
-    if len(sys.argv) > 1:
-        instruct = sys.argv[1]
-    start_chat(instruct=instruct)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('instruct', default=instruct)
+    parser.add_argument('--multi_line', action='store_true')
+    args = parser.parse_args()
+    start_chat(instruct=args.instruct, multiline_input=args.multi_line)
 
 if __name__ == "__main__":
     main()
