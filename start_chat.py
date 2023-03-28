@@ -54,10 +54,10 @@ def save_history(history, save_path):
         json.dump(history, f)
         f.write('\n')
 
-def save_and_clear_history(history, instruct='', save_path='chat_history.log'):
+def save_and_clear_history(history, instruct='', save_path='chat_history.log', message="已经清除历史记录，请重新提问。"):
     save_history(history, save_path)
     history = [{"role": "system", "content": instruct}]
-    print("已经清除历史记录，请重新提问。")
+    print(message)
     return history
 
 def start_chat(instruct, multiline_input=True):
@@ -78,6 +78,9 @@ def start_chat(instruct, multiline_input=True):
     except Exception as e:
         save_and_clear_history(history)
         raise e 
+    except KeyboardInterrupt:
+        save_and_clear_history(history, message="已退出聊天")
+
 
 def main():
     import sys, argparse
