@@ -1,5 +1,9 @@
 from collections import defaultdict
+from email.policy import default
+import os
 from os import environ, getenv
+import yaml
+import argparse
 
 import httpx
 from httpx_socks import SyncProxyTransport
@@ -13,6 +17,10 @@ headers = {
 }
 
 histories = defaultdict(list)
+
+def load_predefined_instructs(instructs_path):
+    cfg = yaml.load(open(instructs_path, encoding='utf8'), Loader=yaml.FullLoader)
+    return cfg
 
 def get_reply(prompt, history=None):
     transport = SyncProxyTransport.from_url(proxy)
@@ -54,8 +62,20 @@ def save_history(history, save_path):
         json.dump(history, f)
         f.write('\n')
 
-def save_and_clear_history(history, instruct='', save_path='chat_history.log', message="已经清除历史记录，请重新提问。"):
+def save_history_with_readable_format(history, save_path):
+    import time 
+    with open(save_path, 'a') as f:
+        f.write('>'*20+time.strftime('%Y/%m/%d-%H:%M:%S ') + '\n')
+        for comment in history:
+            role, content = comment['role'], comment['content']
+            f.write(f'{role}: {content}\n')
+        f.write('\n\n')
+
+def save_and_clear_history(
+    history, instruct='', save_path='chat_history.log', message="已经清除历史记录，请重新提问。"
+):
     save_history(history, save_path)
+    save_history_with_readable_format(history, save_path+'.readable')
     history = [{"role": "system", "content": instruct}]
     print(message)
     return history
@@ -79,17 +99,33 @@ def start_chat(instruct, multiline_input=True):
         save_and_clear_history(history)
         raise e 
     except KeyboardInterrupt:
-        save_and_clear_history(history, message="已退出聊天")
-
+        save_and_clear_history(history, message="\n已退出聊天")
 
 def main():
-    import sys, argparse
-    instruct = "你是一个专业的工作助手，需要回答各种具备专业知识的问题，要求回答严谨、精确。"
+    default_instruct = "你是一个专业的工作助手，需要回答各种具备专业知识的问题，要求回答严谨、精确。"
     parser = argparse.ArgumentParser()
-    parser.add_argument('instruct', default=instruct)
+    parser.add_argument('--instruct', default=default_instruct, type=str)
+    parser.add_argument('--instructs_path', default='instructs.yaml', type=str)
     parser.add_argument('--multi_line', action='store_true')
     args = parser.parse_args()
-    start_chat(instruct=args.instruct, multiline_input=args.multi_line)
+    
+    # Load predefined instructs
+    instructs = {}
+    default_instructs_path = 'default_instruct.yaml'
+    if os.path.exists(default_instructs_path):
+        instructs.update(load_predefined_instructs(default_instructs_path))
+    if os.path.exists(args.instructs_path):
+        instructs.update(load_predefined_instructs(args.instructs_path))
+    print(f'Supported instruct keys: {list(instructs.keys())}')
+    
+    if args.instruct in instructs:
+        print(f'Load predefined instruct of `{args.instruct}` whose content can be ' + \
+            f'found in {default_instructs_path} or {args.instructs_path}')
+        instruct = instructs[args.instruct]
+    else:
+        instruct = args.instruct
+
+    start_chat(instruct=instruct, multiline_input=args.multi_line)
 
 if __name__ == "__main__":
     main()
