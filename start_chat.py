@@ -3,8 +3,6 @@ from collections import defaultdict
 from email.policy import default
 import os
 from os import environ, getenv
-from tkinter.messagebox import QUESTION
-from urllib.request import UnknownHandler
 import yaml
 import argparse
 
