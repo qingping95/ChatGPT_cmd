@@ -1,7 +1,10 @@
+from audioop import mul
 from collections import defaultdict
 from email.policy import default
 import os
 from os import environ, getenv
+from tkinter.messagebox import QUESTION
+from urllib.request import UnknownHandler
 import yaml
 import argparse
 
@@ -18,12 +21,17 @@ headers = {
 
 histories = defaultdict(list)
 
+def insert_before_ext(file_name, insert):
+    index = file_name.rindex('.')
+    return '{}{}{}'.format(file_name[:index], insert, file_name[index:])
+
 def load_predefined_instructs(instructs_path):
     cfg = yaml.load(open(instructs_path, encoding='utf8'), Loader=yaml.FullLoader)
     return cfg
 
 def get_reply(prompt, history=None):
     transport = SyncProxyTransport.from_url(proxy)
+    data = {}
     try:
         if history is None:
             history = []
@@ -37,21 +45,9 @@ def get_reply(prompt, history=None):
                 history.append(reply)
                 return reply['content']
             else:
-                raise Exception("No Response. \n{}".format(data))
+                raise Exception("请求失败。\nMessage: {}".format(data))
     except Exception as e:
-        import logging
-        logging.exception(e)
-        return "请求失败，请重试"
-
-def input_with_enter(hint=''):
-    """遇到一个空行返回结果"""
-    text = []
-    pre_t = input(hint)
-    while pre_t != '':
-        text.append(pre_t)
-        pre_t = input()
-    print('<OK>')
-    return '\n'.join(text)
+        return data
 
 def save_history(history, save_path):
     """json line"""
@@ -68,54 +64,105 @@ def save_history_with_readable_format(history, save_path):
         f.write('>'*20+time.strftime('%Y/%m/%d-%H:%M:%S ') + '\n')
         for comment in history:
             role, content = comment['role'], comment['content']
-            f.write(f'{role}: {content}\n')
+            f.write(f'{role}: {content}\n\n')
         f.write('\n\n')
 
 def save_and_clear_history(
-    history, instruct='', save_path='chat_history.log', message="已经清除历史记录，请重新提问。"
+    history, instruct='', save_path='chat_history.log', message="已开启新的聊天！^_^"
 ):
     save_history(history, save_path)
-    save_history_with_readable_format(history, save_path+'.readable')
+    readable_path = insert_before_ext(save_path, '_readable')
+    save_history_with_readable_format(history, readable_path)
     history = [{"role": "system", "content": instruct}]
     print(message)
     return history
 
-def start_chat(instruct, multiline_input=True):
+def input_multi_line(multi_line=False, hint=''):
+    """如果multi_line=True，接受到一个空行才返回结果"""
+    text = []
+    pre_t = input(hint)
+    while pre_t != '':
+        text.append(pre_t)
+        if not multi_line:
+            break
+        pre_t = input()
+    print('<OK>')
+    return ('\n'.join(text)).strip()
+
+def input_handler(multi_line=False, hint=''):
+    question = input_multi_line(multi_line=multi_line, hint=hint)
+    while question == "":
+        print('请输入询问内容！')
+        question = input_multi_line(multi_line=multi_line, hint=hint)
+
+    if question in {'exit', '退出'}:
+        raise KeyboardInterrupt
+
+    return question
+
+def output_handler(reply, history, instruct, history_path):
+    print("\nChatGPT：\n")
+    if isinstance(reply, str):
+        print(reply.strip())
+
+    elif isinstance(reply, dict):
+        try:
+            if 'error' in reply:
+                if reply['error']['code'] == 'context_length_exceeded':
+                    history = save_and_clear_history(
+                        history, instruct, save_path=history_path, 
+                        message="对话超过我的长度限制啦，已为您保存历史聊天，我们开始新的聊天吧~"
+                    )
+                    return history
+                else:
+                    raise ValueError
+            else:
+                raise ValueError
+        except ValueError as e:
+            print(f"未知错误，请联系管理员。\nChatGPT返回结果：{reply}")
+
+    return history
+
+def start_chat(instruct, multi_line=True, history_path=None):
     history = [{"role": "system", "content": instruct}]
     try:
         while True:
             print('-'*40+'\n')
-            if multiline_input:
-                question = input_with_enter("问：")
-            else:
-                question = input('问：')
+
+            question = input_handler(multi_line=multi_line, hint="问：")
+
             if question == 'clear':
-                history = save_and_clear_history(history, instruct)
+                history = save_and_clear_history(history, instruct, save_path=history_path)
                 continue
-            # history = [{"role": "system", "content": instruct}]
+
             rep = get_reply(question, history)
-            print("\nChatGPT：\n", rep)
+            history = output_handler(rep, history, instruct, history_path)
+
     except Exception as e:
-        save_and_clear_history(history)
+        save_and_clear_history(history, save_path=history_path)
         raise e 
+
     except KeyboardInterrupt:
-        save_and_clear_history(history, message="\n已退出聊天")
+        save_and_clear_history(history, message="\n已退出聊天~", save_path=history_path)
 
 def main():
     default_instruct = "你是一个专业的工作助手，需要回答各种具备专业知识的问题，要求回答严谨、精确。"
     parser = argparse.ArgumentParser()
     parser.add_argument('--instruct', default=default_instruct, type=str)
     parser.add_argument('--instructs_path', default='instructs.yaml', type=str)
+    parser.add_argument('--history_path', default='chat_history.log', type=str)
     parser.add_argument('--multi_line', action='store_true')
     args = parser.parse_args()
     
     # Load predefined instructs
     instructs = {}
-    default_instructs_path = 'default_instruct.yaml'
+    default_instructs_path = 'default_instructs.yaml'
     if os.path.exists(default_instructs_path):
         instructs.update(load_predefined_instructs(default_instructs_path))
     if os.path.exists(args.instructs_path):
         instructs.update(load_predefined_instructs(args.instructs_path))
+    elif args.instructs_path != 'instructs.yaml':
+        print(f"The instructs_path ({args.instructs_path}) you given is not found.")
     print(f'Supported instruct keys: {list(instructs.keys())}')
     
     if args.instruct in instructs:
@@ -125,7 +172,7 @@ def main():
     else:
         instruct = args.instruct
 
-    start_chat(instruct=instruct, multiline_input=args.multi_line)
+    start_chat(instruct=instruct, multi_line=args.multi_line, history_path=args.history_path)
 
 if __name__ == "__main__":
     main()
